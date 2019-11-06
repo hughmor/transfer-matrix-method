@@ -136,15 +136,19 @@ def main():
 
     :return: the values needed for plotting: wavelength meshgrid, angle meshgrid, reflectance, and transmittance
     """
+    # get list of Material objects in stack
     materials = getmaterials()
 
+    # define 2 sweep dimensions and mesh grid
     wavelengths = np.linspace(WAVELENGTH_MIN, WAVELENGTH_MAX, N_WAVELENGTHS)
     angles = np.linspace(ANGLE_MIN, ANGLE_MAX, N_ANGLES)
     wavelengths, angles = np.meshgrid(wavelengths, angles)
 
+    # initialize output arrays
     reflectance = {p: np.zeros(shape=(N_ANGLES, N_WAVELENGTHS)) for p in POLARIZATIONS}
     transmittance = {p: np.zeros(shape=(N_ANGLES, N_WAVELENGTHS)) for p in POLARIZATIONS}
 
+    # run 2 sweep dimensions for each polarizations
     for p in POLARIZATIONS:
         for i in range(N_ANGLES):
             for j in range(N_WAVELENGTHS):

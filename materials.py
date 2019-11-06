@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.constants import h, c, e, epsilon_0, mu_0, pi
+from scipy.constants import h, c, e, epsilon_0, mu_0, pi, elementary_charge, electron_mass
 from cmath import cos, sqrt, exp
 
 PATH = 'data/'
@@ -13,6 +13,16 @@ INDICES = {
     "Silicon": 3.48,
     "Silica": 1.48,
     "Air": 1.0
+}
+
+ELECTRON_DENSITIES = {
+    "Gold": 5.9e28,
+    "Silver": 5.86e28
+}
+
+CONDUCTIVITIES = {
+    "Gold": 4.1e7,
+    "Silver": 6.3e7
 }
 
 
@@ -88,49 +98,54 @@ class Material:
         return np.array([[exp(1j * k * d), 0],
                          [0, exp(-1j * k * d)]])
 
-    def get_n(self, wvl):
+    def get_n(self, wvl, energy=None):
         """
         Gets the complex refractive index of the Material according to its model.
 
         :param wvl: Vacuum wavelength of the propagating wave.
+        :param energy: Energy of the propagating wave. Overrides wavelength if provided.
         :return: Material's refractive index.
         """
         if self.model == 'Constant':
             n = self.n
         elif self.model == 'Drude':
-            eps = self.get_eps(wvl)
+            eps = self.get_eps(wvl, energy=energy)
             ndx = ((eps.real+(eps.real**2+eps.imag**2)**0.5)**0.5)/sqrt(2)
             kppa = ((-eps.real+(eps.real**2+eps.imag**2)**0.5)**0.5)/sqrt(2)
             n = ndx + 1j*kppa
         else:
-            n = self.interpolate_property_value(wvl)
+            n = self.interpolate_property_value(wvl, energy=energy)
         return n
 
-    def get_eps(self, wvl):
+    def get_eps(self, wvl, energy=None):
         """
         Gets the complex permittivity of the Material according to its model.
 
         :param wvl: Vacuum wavelength of the propagating wave.
+        :param energy: Energy of the propagating wave. Overrides wavelength if provided.
         :return: Material's permittivity.
         """
         if self.model == 'Constant':
             eps_r = self.n**2
         elif self.model == 'Drude':
-            eps_r = self.drude_model(wvl)
+            eps_r = self.drude_model(wvl, energy=energy)
         else:
-            n = self.get_n(wvl)
+            n = self.get_n(wvl, energy=energy)
             eps_1 = n.real**2 - n.imag**2
             eps_2 = 2*n.real*n.imag
             eps_r = eps_1 + 1j*eps_2
         return epsilon_0 * eps_r
 
-    def get_mu(self, wvl):
+    def get_mu(self, wvl, energy=None):
         """
-        Gets the complex permeability of the Material according to its model. Currently materials are assumed to be
-        non-magnetic so the function returns the vacuum permeability.
+        Gets the complex permeability of the Material according to its model.
+
+        Currently materials are assumed to be non-magnetic so the function returns the vacuum permeability, but in the
+        future this would look similar to Material.get_eps().
 
         :param wvl: Vacuum wavelength of the propagating wave.
-        :return: Material's permeability
+        :param energy: Energy of the propagating wave. Overrides wavelength if provided.
+        :return: Material's permeability.
         """
         return mu_0
 
@@ -144,14 +159,18 @@ class Material:
         """
         return h * c / wvl
 
-    def interpolate_property_value(self, wvl):
+    def interpolate_property_value(self, wvl, energy=None):
         """
         Performs a linear interpolation on the Material's properties table to get the refractive index from data.
 
         :param wvl: Wavelength at which to interpolate value.
+        :param energy: Energy of the propagating wave. Overrides wavelength if provided.
         :return: Complex refractive index.
         """
-        x = self.get_energy(wvl)
+        if energy is None:
+            x = self.get_energy(wvl)
+        else:
+            x = energy
         arg_closest = np.argmin(np.abs(self.properties['energy'] - x))
         if self.properties['energy'][arg_closest] - x < 0:
             arg_upper = arg_closest+1
@@ -168,11 +187,26 @@ class Material:
         return y_0*(1-(x-x_0)/(x_1-x_0)) + y_1*((x-x_0)/(x_1-x_0))      # linear interpolation
 
     def drude_model(self, wavelength, energy=None):
-        raise NotImplementedError
+        """
+        Gets the complex relative permittivity of the material.
 
-    def drude_helper(self, vals, gmf):
-        return (2*vals[1] - 4*vals[0.5] + 2*vals[0])*gmf**2 + (-vals[1] + 4*vals[0.5] - 3*vals[0])*gmf + vals[0]
+        :param wavelength:
+        :param energy:
+        :return:
+        """
+        if energy is None:
+            w = self.get_energy(wavelength)
+        else:
+            w = energy
+        sigma = CONDUCTIVITIES[self.model]
+        N = ELECTRON_DENSITIES[self.model]
+        tau = electron_mass*sigma/(N*elementary_charge**2)
+        w_p = sqrt((N*elementary_charge**2)/(epsilon_0*electron_mass))
+        eps_1 = 1 - ((w_p*tau)**2)/(1+(w*tau)**2)
+        eps_2 = (tau*w_p**2)/(w*(1+(w*tau)**2))
+        return eps_1 + 1j*eps_2
 
+    # deprecated: new drude model function is above. this is kept for comparison purposes
     def _drude_model(self, wavelength, energy=None):
         if energy is None:
             w = self.get_energy(wavelength)
@@ -196,16 +230,16 @@ class Material:
         Gamma_2s = {0: 0.18819, 0.5: 0.68309, 1: 0.35467}
         A2s = {0: 30.77, 0.5: 57.54, 1: 40.007}
 
-        w_P = self.drude_helper(w_Ps, gmf)
-        Gamma_P = self.drude_helper(Gamma_Ps, gmf)
-        eps_inf = self.drude_helper(eps_infs, gmf)
-        wg1 = self.drude_helper(wg1s, gmf)
-        w01 = self.drude_helper(w01s, gmf)
-        Gamma_1 = self.drude_helper(Gamma_1s, gmf)
-        A1 = self.drude_helper(A1s, gmf)
-        w02 = self.drude_helper(w02s, gmf)
-        Gamma_2 = self.drude_helper(Gamma_2s, gmf)
-        A2 = self.drude_helper(A2s, gmf)
+        w_P = self._drude_helper(w_Ps, gmf)
+        Gamma_P = self._drude_helper(Gamma_Ps, gmf)
+        eps_inf = self._drude_helper(eps_infs, gmf)
+        wg1 = self._drude_helper(wg1s, gmf)
+        w01 = self._drude_helper(w01s, gmf)
+        Gamma_1 = self._drude_helper(Gamma_1s, gmf)
+        A1 = self._drude_helper(A1s, gmf)
+        w02 = self._drude_helper(w02s, gmf)
+        Gamma_2 = self._drude_helper(Gamma_2s, gmf)
+        A2 = self._drude_helper(A2s, gmf)
 
         eps_CP1 = A1*(-np.sqrt(wg1-w01)*np.log(1-((w+1j*Gamma_1)/w01)**2)/(2*(w+1j*Gamma_1)**2) +
                       2*np.sqrt(wg1)*np.arctanh(np.sqrt((wg1-w01)/wg1))/(w+1j*Gamma_1)**2 -
@@ -213,6 +247,10 @@ class Material:
                       np.sqrt(w+1j*Gamma_1-wg1)*np.arctanh(np.sqrt((wg1-w01)/(w+1j*Gamma_1+wg1)))/(w+1j*Gamma_1)**2)
         eps_CP2 = A2*np.log(1-((w+1j*Gamma_2)/w02)**2)/(2*(w+1j*Gamma_2)**2)
         return eps_inf - w_P**2/(w**2 + 1j*w*Gamma_P) + eps_CP1 + eps_CP2
+
+    @staticmethod
+    def _drude_helper(vals, gmf):
+        return (2*vals[1] - 4*vals[0.5] + 2*vals[0])*gmf**2 + (-vals[1] + 4*vals[0.5] - 3*vals[0])*gmf + vals[0]
 
     def import_properties(self):
         """ Imports material properties from Excel file. """

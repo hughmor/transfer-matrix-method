@@ -2,3 +2,5 @@ __pycache__
 venv
 .DS_Store
 .idea
+old_drude_model.py
+.ipynb_checkpoints

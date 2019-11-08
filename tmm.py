@@ -3,45 +3,7 @@ from math import pi
 import numpy as np
 from materials import Material
 import sys
-
-EPSILON = sys.float_info.epsilon    # typical floating-point calculation error
-
-
-def correct_theta(theta, n):
-    """
-    Checks if the angle supplied is the correct forward-facing angle in a material of refractive index n.
-
-    :param theta: Complex angle of propagating wave.
-    :param n: Complex refractive index of current material.
-    :return: True if the angle is forward facing, False if not.
-    """
-    assert n.real * n.imag >= 0
-    ncostheta = n * cos(theta)
-    if abs(ncostheta.imag) > 100 * EPSILON:
-        answer = (ncostheta.imag > 0)
-    else:
-        answer = (ncostheta.real > 0)
-    return answer
-
-
-def get_refraction_angle(material_1, material_2, wavelength, theta_1):
-    """
-    Uses Snell's Law to get the angle of the propagating wave in material_2 after refracting from material_1 with angle
-    theta_1.
-
-    :param material_1: Material light is coming from.
-    :param material_2: Material light is refracting into.
-    :param wavelength: Vacuum wavelength of the propagating wave.
-    :param theta_1: Complex angle of the propagating wave in material_1.
-    :return: Complex angle of the propagating wave in material_2.
-    """
-    n1 = material_1.get_n(wavelength)
-    n2 = material_2.get_n(wavelength)
-    theta_2 = asin(n1 * sin(theta_1) / n2)
-    if correct_theta(theta_2, n2):
-        return theta_2
-    else:
-        return pi - theta_2
+FLOAT_ERROR = sys.float_info.epsilon
 
 
 def tmm(materials, wavelength, angle, polarization):
@@ -53,10 +15,10 @@ def tmm(materials, wavelength, angle, polarization):
     The output values are pulled from the matrix M.
 
     :param materials: List of Material objects defining the multi-layer slab.
-    :param wavelength: Vacuum wavelength of the wave.
+    :param wavelength: Vacuum wavelength of the wave in nanometres.
     :param angle: Incident angle of the wave.
     :param polarization: Polarization of incoming wave. Can be either 'TE' or 'TM'.
-    :return: Fraction of incident power transmitted, fraction of icident power reflected
+    :return: Fraction of incident power transmitted, fraction of incident power reflected.
     """
     outer_material = Material('Air')    # semi-infinite slabs of air outside the structure
     prev_material = outer_material
@@ -71,7 +33,43 @@ def tmm(materials, wavelength, angle, polarization):
     angle = get_refraction_angle(prev_material, outer_material, wavelength, angle)
     D_out = outer_material.dynamical_matrix(wavelength, angle, polarization)
     M = M.dot(D_out)
+
     T = np.abs((1 / M[0, 0])) ** 2
     R = np.abs((M[1, 0] / M[0, 0])) ** 2
     return T, R
 
+
+def correct_theta(theta, n):
+    """
+    Checks if the angle supplied is the correct forward angle in a material of refractive index n.
+
+    :param theta: Complex angle of propagating wave.
+    :param n: Complex refractive index of current material.
+    :return: True if the angle is forward facing, False if not.
+    """
+    assert n.real * n.imag >= 0, 'Does not support gain media...'
+    val = n * cos(theta)
+    if np.abs(val.imag) > 100 * FLOAT_ERROR:    # imaginary part is not zero within rounding error
+        return bool(val.imag > 0)
+    else:
+        return bool(val.real > 0)
+
+
+def get_refraction_angle(material_1, material_2, wavelength, theta_1):
+    """
+    Uses Snell's Law to get the angle of the propagating wave in material_2 after refracting from material_1 with angle
+    theta_1.
+
+    :param material_1: Material light is coming from.
+    :param material_2: Material light is refracting into.
+    :param wavelength: Vacuum wavelength of the propagating wave in nanometres.
+    :param theta_1: Complex angle of the propagating wave in material_1.
+    :return: Complex angle of the propagating wave in material_2.
+    """
+    n1 = material_1.get_n(wavelength)
+    n2 = material_2.get_n(wavelength)
+    theta_2 = asin(n1*sin(theta_1)/n2)
+    if correct_theta(theta_2, n2):
+        return theta_2
+    else:
+        return pi - theta_2

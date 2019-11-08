@@ -2,7 +2,8 @@ import matplotlib as mpl
 import matplotlib.style
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from tmm import tmm, np, pi
+from tmm import tmm, np
+from math import pi
 from materials import Material, INDICES
 mpl.style.use('seaborn-whitegrid')
 
@@ -16,8 +17,8 @@ WAVELENGTH_MIN = 400.0  # nanometres
 WAVELENGTH_MAX = 1700.0
 N_WAVELENGTHS = 1000
 ANGLE_MIN = 0.0
-ANGLE_MAX = 45 * pi / 180
-N_ANGLES = 100
+ANGLE_MAX = 90 * pi/180
+N_ANGLES = 5
 
 # change these to control the default plot settings
 PLOT2D = True

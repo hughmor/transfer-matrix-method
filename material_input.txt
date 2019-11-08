@@ -1,4 +1,4 @@
-model=drude
+model=johnson
 silver,50
 silicon,100
 gold,50

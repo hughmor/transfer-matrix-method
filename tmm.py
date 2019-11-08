@@ -1,9 +1,6 @@
-from cmath import cos, sin, asin
-from math import pi
+from cmath import sin, asin
 import numpy as np
 from materials import Material
-import sys
-FLOAT_ERROR = sys.float_info.epsilon
 
 
 def tmm(materials, wavelength, angle, polarization):
@@ -39,22 +36,6 @@ def tmm(materials, wavelength, angle, polarization):
     return T, R
 
 
-def correct_theta(theta, n):
-    """
-    Checks if the angle supplied is the correct forward angle in a material of refractive index n.
-
-    :param theta: Complex angle of propagating wave.
-    :param n: Complex refractive index of current material.
-    :return: True if the angle is forward facing, False if not.
-    """
-    assert n.real * n.imag >= 0, 'Does not support gain media...'
-    val = n * cos(theta)
-    if np.abs(val.imag) > 100 * FLOAT_ERROR:    # imaginary part is not zero within rounding error
-        return bool(val.imag > 0)
-    else:
-        return bool(val.real > 0)
-
-
 def get_refraction_angle(material_1, material_2, wavelength, theta_1):
     """
     Uses Snell's Law to get the angle of the propagating wave in material_2 after refracting from material_1 with angle
@@ -69,7 +50,4 @@ def get_refraction_angle(material_1, material_2, wavelength, theta_1):
     n1 = material_1.get_n(wavelength)
     n2 = material_2.get_n(wavelength)
     theta_2 = asin(n1*sin(theta_1)/n2)
-    if correct_theta(theta_2, n2):
-        return theta_2
-    else:
-        return pi - theta_2
+    return theta_2

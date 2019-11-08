@@ -72,19 +72,6 @@ class Material:
         else:
             raise ValueError('Invalid Polarization')
 
-    def get_normal_wavevector(self, wavelength, theta):
-        """
-        Gets the normal component of the wavevector of the light traveling in the Material for a certain wavelength and
-        angle.
-
-        :param wavelength: Vacuum wavelength of the propagating wave in nanometres.
-        :param theta: Complex angle (measured from the normal) of the propagating wave.
-        :return: Value of the normal component of the wavevector.
-        """
-        n = self.get_n(wavelength)
-        k = 2 * pi * n * cos(theta) / wavelength
-        return k
-
     def propagation_matrix(self, wavelength, theta):
         """
         Generates the propagation matrix through the Material at a specific wavelength and angle.
@@ -97,6 +84,19 @@ class Material:
         d = self.d
         return np.array([[exp(-1j * k * d), 0],
                         [0, exp(1j * k * d)]])
+
+    def get_normal_wavevector(self, wavelength, theta):
+        """
+        Gets the normal component of the wavevector of the light traveling in the Material for a certain wavelength and
+        angle.
+
+        :param wavelength: Vacuum wavelength of the propagating wave in nanometres.
+        :param theta: Complex angle (measured from the normal) of the propagating wave.
+        :return: Value of the normal component of the wavevector.
+        """
+        n = self.get_n(wavelength)
+        k = 2 * pi * n * cos(theta) / wavelength
+        return k
 
     def get_n(self, wavelength, energy=None):
         """
